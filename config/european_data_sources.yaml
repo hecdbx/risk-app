@@ -1,0 +1,386 @@
+# European Climate Risk Data Sources Configuration
+# For Flood and Drought Risk Assessment
+
+# European Terrain and Elevation Data Sources
+terrain_data:
+  
+  copernicus_dem:
+    name: "Copernicus Digital Elevation Model"
+    provider: "European Space Agency (ESA)"
+    url: "https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model"
+    description: "High-resolution digital surface model covering Europe"
+    resolution: ["30m", "90m"]
+    format: "GeoTIFF"
+    coverage: "Europe and Global"
+    download_endpoint: "https://prism-dem-open.copernicus.eu/pd-desk-open-access/prismDownload"
+    api_type: "OpenSearch"
+    crs: "EPSG:4326"
+    data_types:
+      - dem_30m  # 30m resolution DEM
+      - dem_90m  # 90m resolution DEM
+    processing_requirements:
+      - mosaic_tiles
+      - reproject_to_epsg3035  # European grid system
+      - generate_slope
+      - generate_aspect
+      - calculate_flow_accumulation
+    
+  eea_elevation:
+    name: "European Environment Agency Elevation Data"
+    provider: "European Environment Agency (EEA)"
+    url: "https://www.eea.europa.eu/data-and-maps/data/eu-dem"
+    description: "EU-DEM digital elevation model for European Union"
+    resolution: "25m"
+    format: "GeoTIFF"
+    coverage: "EU27 + EFTA countries"
+    crs: "EPSG:3035"
+    version: "v1.1"
+    data_quality:
+      vertical_accuracy: "±7m"
+      horizontal_accuracy: "±25m"
+    processing_steps:
+      - validate_coverage
+      - fill_voids
+      - generate_terrain_derivatives
+      - create_h3_index
+      
+  opengeohub_terrain:
+    name: "OpenGeoHub Soil and Terrain Data"
+    provider: "OpenGeoHub Foundation"
+    url: "https://opengeohub.org/datasets"
+    description: "High-resolution soil and terrain characteristics for Europe"
+    resolution: "250m"
+    format: ["GeoTIFF", "Cloud Optimized GeoTIFF"]
+    coverage: "Europe"
+    layers:
+      - dtm_elevation  # Digital Terrain Model
+      - slope_percentage
+      - aspect_degrees
+      - topographic_wetness_index
+      - terrain_ruggedness_index
+      - soil_water_content
+      - soil_texture
+      - soil_organic_carbon
+    access:
+      type: "Open Data"
+      protocol: "HTTPS"
+      cloud_storage: "s3://eu-west-1"
+    processing:
+      - stack_raster_layers
+      - resample_to_common_grid
+      - extract_by_country
+      
+  geoharmonizer_datasets:
+    name: "GeoHarmonizer European Soil and Terrain Datasets"
+    provider: "OpenGeoHub / GeoHarmonizer"
+    url: "https://github.com/Envirometrix/LandGISmaps"
+    description: "Harmonized global and European environmental layers"
+    resolution: ["250m", "1km"]
+    format: "Cloud Optimized GeoTIFF"
+    coverage: "Europe and Global"
+    zenodo_repository: "https://zenodo.org/communities/geoharmonizer"
+    layers:
+      - dtm_elevation_m
+      - slope_deg
+      - twi_wetness_index
+      - dtm_curvature
+      - dtm_convergence_index
+      - landform_classification
+      - flow_direction
+      - flow_accumulation
+    cloud_native:
+      enabled: true
+      storage: "Zenodo + AWS S3"
+      access_pattern: "COG with overview pyramids"
+
+# European Climate and Weather Data
+weather_data:
+  
+  accuweather_europe:
+    name: "AccuWeather European Locations"
+    provider: "AccuWeather"
+    url: "https://developer.accuweather.com/apis"
+    description: "Real-time and forecast weather data for European cities"
+    api_version: "v1"
+    authentication: "api_key"
+    endpoints:
+      current_conditions: "/currentconditions/v1/{locationKey}"
+      hourly_forecast: "/forecasts/v1/hourly/12hour/{locationKey}"
+      daily_forecast: "/forecasts/v1/daily/5day/{locationKey}"
+      historical: "/currentconditions/v1/{locationKey}/historical/24"
+      precipitation: "/forecasts/v1/daily/5day/{locationKey}?details=true"
+    european_capitals:
+      - {key: "178087", name: "Paris, France", lat: 48.8566, lon: 2.3522, country: "FR"}
+      - {key: "308526", name: "Berlin, Germany", lat: 52.5200, lon: 13.4050, country: "DE"}
+      - {key: "308084", name: "Madrid, Spain", lat: 40.4168, lon: -3.7038, country: "ES"}
+      - {key: "213490", name: "Rome, Italy", lat: 41.9028, lon: 12.4964, country: "IT"}
+      - {key: "274087", name: "Amsterdam, Netherlands", lat: 52.3676, lon: 4.9041, country: "NL"}
+      - {key: "264885", name: "Brussels, Belgium", lat: 50.8503, lon: 4.3517, country: "BE"}
+      - {key: "315078", name: "Vienna, Austria", lat: 48.2082, lon: 16.3738, country: "AT"}
+      - {key: "264379", name: "Warsaw, Poland", lat: 52.2297, lon: 21.0122, country: "PL"}
+      - {key: "324505", name: "Bucharest, Romania", lat: 44.4268, lon: 26.1025, country: "RO"}
+      - {key: "324582", name: "Athens, Greece", lat: 37.9838, lon: 23.7275, country: "GR"}
+      - {key: "328328", name: "Stockholm, Sweden", lat: 59.3293, lon: 18.0686, country: "SE"}
+      - {key: "316665", name: "Copenhagen, Denmark", lat: 55.6761, lon: 12.5683, country: "DK"}
+      - {key: "318849", name: "Helsinki, Finland", lat: 60.1699, lon: 24.9384, country: "FI"}
+      - {key: "274456", name: "Lisbon, Portugal", lat: 38.7223, lon: -9.1393, country: "PT"}
+      - {key: "264171", name: "Dublin, Ireland", lat: 53.3498, lon: -6.2603, country: "IE"}
+    variables:
+      - temperature
+      - precipitation
+      - humidity
+      - wind_speed
+      - pressure
+      - cloud_cover
+      - uv_index
+      - visibility
+    rate_limits:
+      free_tier: "50 calls/day"
+      standard_tier: "25000 calls/day"
+  
+  copernicus_climate:
+    name: "Copernicus Climate Data Store"
+    provider: "European Centre for Medium-Range Weather Forecasts (ECMWF)"
+    url: "https://cds.climate.copernicus.eu"
+    description: "ERA5 reanalysis and climate projections for Europe"
+    datasets:
+      era5_land:
+        name: "ERA5-Land hourly data"
+        resolution: "9km"
+        temporal: "hourly"
+        variables:
+          - temperature_2m
+          - total_precipitation
+          - soil_moisture_level_1
+          - soil_moisture_level_2
+          - volumetric_soil_water_layer_1
+          - evaporation
+          - runoff
+          - snowfall
+      era5_pressure:
+        name: "ERA5 pressure levels"
+        resolution: "25km"
+        variables:
+          - relative_humidity
+          - geopotential
+          - temperature
+          - wind_components
+    api:
+      type: "CDS API"
+      authentication: "api_key"
+      format: ["NetCDF", "GRIB"]
+      
+  eea_water_monitoring:
+    name: "European Environment Agency Water Monitoring"
+    provider: "EEA"
+    url: "https://water.europa.eu/freshwater"
+    description: "River discharge, water levels, and drought indicators"
+    datasets:
+      river_discharge:
+        frequency: "daily"
+        format: "CSV"
+        coverage: "EU river basins"
+      drought_indicator:
+        frequency: "weekly"
+        format: "GeoJSON"
+        indicators:
+          - combined_drought_indicator
+          - precipitation_anomaly
+          - soil_moisture_anomaly
+          - vegetation_health_index
+
+# Hydrography and Water Features
+hydrography_data:
+  
+  european_river_network:
+    name: "European River Network Database"
+    provider: "European Environment Agency"
+    url: "https://www.eea.europa.eu/data-and-maps/data/european-river-network"
+    format: "Shapefile, GeoPackage"
+    coverage: "Pan-European"
+    features:
+      - rivers
+      - streams
+      - water_bodies
+      - catchment_areas
+      
+  eu_flood_directive:
+    name: "EU Flood Directive Database"
+    provider: "European Commission"
+    url: "https://water.europa.eu/freshwater/flood-risk-management"
+    description: "Flood hazard and risk maps under EU Flood Directive"
+    datasets:
+      flood_hazard_maps:
+        scenarios: ["high", "medium", "low"]
+        return_periods: [10, 50, 100, 200, 500]
+        format: "GeoTIFF, WMS"
+      flood_risk_zones:
+        format: "Shapefile"
+        attributes:
+          - population_affected
+          - economic_damage
+          - infrastructure_risk
+
+# Satellite and Remote Sensing
+satellite_data:
+  
+  sentinel2_vegetation:
+    name: "Sentinel-2 Vegetation Indices"
+    provider: "ESA Copernicus"
+    url: "https://scihub.copernicus.eu/"
+    description: "Optical imagery for vegetation monitoring"
+    resolution: "10m-20m"
+    temporal: "5 days"
+    indices:
+      - ndvi  # Normalized Difference Vegetation Index
+      - ndwi  # Normalized Difference Water Index
+      - evi   # Enhanced Vegetation Index
+      - msavi # Modified Soil Adjusted Vegetation Index
+    format: "GeoTIFF"
+    access:
+      api: "Copernicus Open Access Hub"
+      cloud: "AWS, Google Earth Engine"
+      
+  sentinel1_flood:
+    name: "Sentinel-1 SAR for Flood Detection"
+    provider: "ESA Copernicus"
+    url: "https://scihub.copernicus.eu/"
+    description: "Synthetic Aperture Radar for flood mapping"
+    resolution: "10m"
+    temporal: "6-12 days"
+    products:
+      - grd  # Ground Range Detected
+      - slc  # Single Look Complex
+    applications:
+      - flood_extent_mapping
+      - soil_moisture_estimation
+      - land_subsidence_monitoring
+
+# Data Processing Configuration
+processing_config:
+  
+  spatial_reference:
+    european_grid: "EPSG:3035"  # ETRS89-extended / LAEA Europe
+    web_mercator: "EPSG:3857"
+    wgs84: "EPSG:4326"
+    
+  resolution_standards:
+    high_res: "30m"
+    medium_res: "250m"
+    low_res: "1km"
+    
+  h3_indexing:
+    resolutions:
+      country_level: 4
+      regional_level: 6
+      city_level: 8
+      neighborhood_level: 10
+      
+  cloud_storage:
+    raw_data: "/mnt/european-climate-risk/raw/"
+    processed_data: "/mnt/european-climate-risk/processed/"
+    terrain_tiles: "/mnt/european-climate-risk/terrain/"
+    weather_archives: "/mnt/european-climate-risk/weather/"
+    
+  unity_catalog:
+    catalog: "demo_hc"
+    schemas:
+      raw: "raw_data"
+      processed: "processed_data"
+      analytics: "risk_analytics"
+      
+# Risk Model Parameters
+risk_parameters:
+  
+  flood_risk:
+    terrain_factors:
+      - elevation
+      - slope
+      - flow_accumulation
+      - topographic_wetness_index
+      - distance_to_water
+    weather_factors:
+      - cumulative_precipitation_7d
+      - cumulative_precipitation_30d
+      - precipitation_intensity
+      - soil_saturation
+    thresholds:
+      extreme_precipitation_daily: 100  # mm
+      high_precipitation_daily: 50      # mm
+      slope_flood_prone: 5               # degrees
+      twi_flood_threshold: 15            # index value
+      
+  drought_risk:
+    climate_factors:
+      - precipitation_deficit
+      - temperature_anomaly
+      - evapotranspiration
+      - soil_moisture
+      - vegetation_health
+    indices:
+      - spi  # Standardized Precipitation Index
+      - spei # Standardized Precipitation Evapotranspiration Index
+      - vci  # Vegetation Condition Index
+      - smi  # Soil Moisture Index
+    thresholds:
+      severe_drought_spi: -2.0
+      moderate_drought_spi: -1.5
+      consecutive_dry_days: 30
+      soil_moisture_critical: 0.2  # volumetric
+
+# Data Quality and Validation
+quality_control:
+  
+  terrain_data_validation:
+    - rule: "elevation_range"
+      condition: "elevation_m BETWEEN -500 AND 5000"
+      description: "Valid elevation range for Europe"
+    - rule: "slope_range"
+      condition: "slope_degrees BETWEEN 0 AND 90"
+      description: "Valid slope values"
+    - rule: "no_data_handling"
+      condition: "elevation_m IS NOT NULL"
+      description: "Handle NoData values appropriately"
+      
+  weather_data_validation:
+    - rule: "temperature_range"
+      condition: "temperature_celsius BETWEEN -50 AND 50"
+      description: "Valid temperature range for Europe"
+    - rule: "precipitation_non_negative"
+      condition: "precipitation_mm >= 0"
+      description: "Precipitation cannot be negative"
+    - rule: "temporal_consistency"
+      condition: "observation_time IS NOT NULL"
+      description: "Valid timestamps required"
+      
+  spatial_consistency:
+    - rule: "coordinate_bounds"
+      condition: "latitude BETWEEN 35 AND 72 AND longitude BETWEEN -25 AND 45"
+      description: "Valid European geographic bounds"
+    - rule: "h3_cell_validity"
+      condition: "h3_is_valid(h3_cell) = true"
+      description: "Valid H3 spatial index"
+
+# Update Schedules
+update_schedules:
+  
+  terrain_data:
+    copernicus_dem: "static"  # Update only when new versions released
+    eea_elevation: "yearly"
+    opengeohub: "yearly"
+    geoharmonizer: "quarterly"
+    
+  weather_data:
+    accuweather_current: "hourly"
+    accuweather_forecast: "6 hours"
+    era5_reanalysis: "daily"
+    
+  satellite_data:
+    sentinel2: "weekly"
+    sentinel1: "bi-weekly"
+    
+  risk_models:
+    flood_risk_update: "daily"
+    drought_risk_update: "weekly"
+    validation_reports: "monthly"
+
