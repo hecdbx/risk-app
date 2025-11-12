@@ -1,16 +1,16 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # European Climate Risk Pipeline Orchestrator
-# MAGIC 
+# MAGIC
 # MAGIC This notebook orchestrates the execution of all European climate risk data pipelines using Databricks Workflows and Delta Live Tables.
-# MAGIC 
+# MAGIC
 # MAGIC ## Pipelines Managed
-# MAGIC 
+# MAGIC
 # MAGIC 1. **Terrain/DEM Ingestion** - Copernicus, EEA, OpenGeoHub, GeoHarmonizer
 # MAGIC 2. **AccuWeather European Locations Ingestion** - Real-time weather data
 # MAGIC 3. **Flood Risk Transformation** - Risk scoring and evacuation zones
 # MAGIC 4. **Drought Risk Transformation** - Drought indices and impact assessment
-# MAGIC 
+# MAGIC
 # MAGIC **Author:** Climate Risk Analytics Team  
 # MAGIC **Date:** 2025-11-12  
 # MAGIC **Catalog:** demo_hc
@@ -32,7 +32,7 @@ import json
 
 # MAGIC %md
 # MAGIC ## EuropeanRiskPipelineOrchestrator Class
-# MAGIC 
+# MAGIC
 # MAGIC Main orchestrator class for managing all climate risk pipelines.
 
 # COMMAND ----------
@@ -70,25 +70,25 @@ class EuropeanRiskPipelineOrchestrator:
                     "terrain_ingestion": {
                         "name": "european_terrain_dem_ingestion",
                         "notebook": "/Workspace/Shared/risk_app/pipelines/01_terrain_dem_ingestion",
-                        "schedule": "0 0 * * 0",  # Weekly on Sunday
+                        "schedule": "0 0 0 ? * SUN",  # Weekly on Sunday (Quartz format)
                         "cluster_size": "Medium"
                     },
                     "weather_ingestion": {
                         "name": "accuweather_europe_ingestion",
                         "notebook": "/Workspace/Shared/risk_app/pipelines/02_accuweather_europe_ingestion",
-                        "schedule": "0 * * * *",  # Hourly
+                        "schedule": "0 0 * * * ?",  # Hourly (Quartz format)
                         "cluster_size": "Small"
                     },
                     "flood_risk": {
                         "name": "flood_risk_transformation",
                         "notebook": "/Workspace/Shared/risk_app/pipelines/03_flood_risk_transformation",
-                        "schedule": "15 * * * *",  # Hourly at :15
+                        "schedule": "0 15 * * * ?",  # Hourly at :15 (Quartz format)
                         "cluster_size": "Medium"
                     },
                     "drought_risk": {
                         "name": "drought_risk_transformation",
                         "notebook": "/Workspace/Shared/risk_app/pipelines/04_drought_risk_transformation",
-                        "schedule": "0 6 * * *",  # Daily at 6 AM
+                        "schedule": "0 0 6 * * ?",  # Daily at 6 AM (Quartz format)
                         "cluster_size": "Medium"
                     }
                 }
@@ -110,55 +110,53 @@ class EuropeanRiskPipelineOrchestrator:
         cluster_configs = {
             "Small": {
                 "num_workers": 2,
-                "node_type_id": "i3.xlarge"
+                "node_type_id": "Standard_DS3_v2"
             },
             "Medium": {
                 "num_workers": 4,
-                "node_type_id": "i3.2xlarge"
+                "node_type_id": "Standard_DS4_v2"
             },
             "Large": {
                 "num_workers": 8,
-                "node_type_id": "i3.4xlarge"
+                "node_type_id": "Standard_DS5_v2"
             }
         }
         
         cluster_size = pipeline_config.get("cluster_size", "Medium")
         cluster_config = cluster_configs[cluster_size]
         
-        # Create pipeline specification
-        pipeline_spec = pipelines.CreatePipelineRequest(
-            name=pipeline_config["name"],
-            libraries=[
-                pipelines.PipelineLibrary(
-                    notebook=pipelines.NotebookLibrary(
-                        path=pipeline_config["notebook"]
-                    )
-                )
-            ],
-            clusters=[
-                pipelines.PipelineCluster(
-                    label="default",
-                    num_workers=cluster_config["num_workers"],
-                    node_type_id=cluster_config["node_type_id"],
-                    custom_tags={
-                        "project": "european_climate_risk",
-                        "pipeline": pipeline_config["name"]
-                    }
-                )
-            ],
-            configuration={
-                "pipelines.applyChangesPreviewEnabled": "true",
-                "pipelines.useSharedClusters": "false"
-            },
-            target=f"{self.config['catalog']}.{self.config['schemas']['processed_data']}",
-            continuous=False,  # Triggered mode
-            development=False,  # Production mode
-            photon=True,  # Enable Photon for performance
-            channel="CURRENT"
-        )
-        
+        # Create pipeline specification using correct SDK structure
         try:
-            response = self.workspace.pipelines.create(pipeline_spec)
+            response = self.workspace.pipelines.create(
+                name=pipeline_config["name"],
+                libraries=[
+                    pipelines.PipelineLibrary(
+                        notebook=pipelines.NotebookLibrary(
+                            path=pipeline_config["notebook"]
+                        )
+                    )
+                ],
+                clusters=[
+                    pipelines.PipelineCluster(
+                        label="default",
+                        num_workers=cluster_config["num_workers"],
+                        node_type_id=cluster_config["node_type_id"],
+                        custom_tags={
+                            "project": "european_climate_risk",
+                            "pipeline": pipeline_config["name"]
+                        }
+                    )
+                ],
+                configuration={
+                    "pipelines.applyChangesPreviewEnabled": "true",
+                    "pipelines.useSharedClusters": "false"
+                },
+                target=f"{self.config['catalog']}.{self.config['schemas']['processed_data']}",
+                continuous=False,
+                development=False,
+                photon=True,
+                channel="CURRENT"
+            )
             pipeline_id = response.pipeline_id
             print(f"✓ Pipeline created successfully: {pipeline_id}")
             return pipeline_id
@@ -191,7 +189,7 @@ class EuropeanRiskPipelineOrchestrator:
                         pipeline_id=pipeline_ids["terrain_ingestion"],
                         full_refresh=False
                     ),
-                    timeout_seconds=7200  # 2 hours
+                    timeout_seconds=7200
                 )
             )
         
@@ -205,7 +203,7 @@ class EuropeanRiskPipelineOrchestrator:
                         full_refresh=False
                     ),
                     depends_on=[jobs.TaskDependency(task_key="terrain_ingestion")],
-                    timeout_seconds=1800  # 30 minutes
+                    timeout_seconds=1800
                 )
             )
         
@@ -222,7 +220,7 @@ class EuropeanRiskPipelineOrchestrator:
                         jobs.TaskDependency(task_key="terrain_ingestion"),
                         jobs.TaskDependency(task_key="weather_ingestion")
                     ],
-                    timeout_seconds=3600  # 1 hour
+                    timeout_seconds=3600
                 )
             )
         
@@ -239,39 +237,33 @@ class EuropeanRiskPipelineOrchestrator:
                         jobs.TaskDependency(task_key="terrain_ingestion"),
                         jobs.TaskDependency(task_key="weather_ingestion")
                     ],
-                    timeout_seconds=3600  # 1 hour
+                    timeout_seconds=3600
                 )
             )
         
         # Create job specification
-        job_spec = jobs.CreateJobRequest(
-            name=job_name,
-            tasks=tasks,
-            job_clusters=[],  # DLT pipelines use their own clusters
-            schedule=jobs.CronSchedule(
-                quartz_cron_expression="0 * * * *",  # Run hourly
-                timezone_id="UTC",
-                pause_status=jobs.PauseStatus.UNPAUSED
-            ),
-            email_notifications=jobs.JobEmailNotifications(
-                on_failure=["climate-risk-team@company.com"],
-                on_success=[],
-                no_alert_for_skipped_runs=True
-            ),
-            webhook_notifications=jobs.WebhookNotifications(
-                on_failure=[],
-                on_success=[]
-            ),
-            timeout_seconds=14400,  # 4 hours total
-            max_concurrent_runs=1,
-            tags={
-                "project": "european_climate_risk",
-                "environment": "production"
-            }
-        )
-        
         try:
-            response = self.workspace.jobs.create(job_spec)
+            response = self.workspace.jobs.create(
+                name=job_name,
+                tasks=tasks,
+                job_clusters=[],
+                schedule=jobs.CronSchedule(
+                    quartz_cron_expression="0 0 * * * ?",  # Hourly using Quartz format
+                    timezone_id="UTC",
+                    pause_status=jobs.PauseStatus.UNPAUSED
+                ),
+                email_notifications=jobs.JobEmailNotifications(
+                    on_failure=["climate-risk-team@company.com"],
+                    on_success=[],
+                    no_alert_for_skipped_runs=True
+                ),
+                timeout_seconds=14400,
+                max_concurrent_runs=1,
+                tags={
+                    "project": "european_climate_risk",
+                    "environment": "production"
+                }
+            )
             job_id = response.job_id
             print(f"✓ Workflow job created successfully: {job_id}")
             return job_id
@@ -417,14 +409,14 @@ class EuropeanRiskPipelineOrchestrator:
 
 # MAGIC %md
 # MAGIC ## Deployment Functions
-# MAGIC 
+# MAGIC
 # MAGIC Use these functions to deploy and manage the climate risk pipelines.
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ### Option 1: Deploy All Pipelines (Recommended)
-# MAGIC 
+# MAGIC
 # MAGIC This will:
 # MAGIC 1. Set up Unity Catalog schemas
 # MAGIC 2. Create all 4 DLT pipelines
@@ -474,7 +466,7 @@ displayHTML(f"""
 
 # MAGIC %md
 # MAGIC ### Option 2: Check Pipeline Status
-# MAGIC 
+# MAGIC
 # MAGIC Query the status of a specific pipeline.
 
 # COMMAND ----------
@@ -489,7 +481,7 @@ displayHTML(f"""
 
 # MAGIC %md
 # MAGIC ### Option 3: Manually Trigger a Pipeline
-# MAGIC 
+# MAGIC
 # MAGIC Trigger a specific pipeline on demand.
 
 # COMMAND ----------
@@ -508,14 +500,28 @@ displayHTML(f"""
 
 # COMMAND ----------
 
-# Save deployment info to JSON
-with open("/dbfs/FileStore/risk_app/deployment_info.json", "w") as f:
-    json.dump(deployment_result, f, indent=2)
+import os
+import pandas as pd
 
-print("✓ Deployment information saved to: /dbfs/FileStore/risk_app/deployment_info.json")
+# Use Unity Catalog volume for secure file storage
+volume_path = "/Volumes/demo_hc/risk_analytics/deployment_files"
+
+# Create directory if it doesn't exist
+try:
+    os.makedirs(volume_path, exist_ok=True)
+    
+    # Save deployment info to JSON in volume
+    file_path = f"{volume_path}/deployment_info.json"
+    with open(file_path, "w") as f:
+        json.dump(deployment_result, f, indent=2)
+    
+    print(f"✓ Deployment information saved to volume: {file_path}")
+except Exception as e:
+    print(f"Note: Could not save to volume (volume may not exist): {e}")
+    print("Deployment info (in memory):")
+    print(json.dumps(deployment_result, indent=2))
 
 # Display as DataFrame for easy viewing
-import pandas as pd
 df_pipelines = pd.DataFrame([
     {"Pipeline": name, "Pipeline ID": pid}
     for name, pid in deployment_result['pipeline_ids'].items()
@@ -526,7 +532,7 @@ display(df_pipelines)
 
 # MAGIC %md
 # MAGIC ## Query Risk Data
-# MAGIC 
+# MAGIC
 # MAGIC Once pipelines have run, you can query the risk analytics data.
 
 # COMMAND ----------
@@ -560,7 +566,7 @@ display(df_pipelines)
 
 # MAGIC %md
 # MAGIC ## Pipeline Architecture
-# MAGIC 
+# MAGIC
 # MAGIC ```
 # MAGIC Data Sources → Ingestion (Bronze) → Processing (Silver) → Analytics (Gold)
 # MAGIC      ↓              ↓                      ↓                    ↓
@@ -569,13 +575,13 @@ display(df_pipelines)
 # MAGIC   Satellite       Quality checks     H3 indexing            Time series
 # MAGIC                                      ST functions           Summaries
 # MAGIC ```
-# MAGIC 
+# MAGIC
 # MAGIC ### Pipelines:
 # MAGIC 1. **Terrain Ingestion** (Weekly) - Copernicus, EEA, OpenGeoHub, GeoHarmonizer
 # MAGIC 2. **Weather Ingestion** (Hourly) - AccuWeather API for 15 European capitals
 # MAGIC 3. **Flood Risk** (Hourly) - Risk scoring, evacuation zones, alerts
 # MAGIC 4. **Drought Risk** (Daily) - SPI, SPEI, SMI indices, restriction zones
-# MAGIC 
+# MAGIC
 # MAGIC ### Features:
 # MAGIC - ✅ H3 hexagonal spatial indexing
 # MAGIC - ✅ ST geospatial functions (buffers, distances, areas)
@@ -587,19 +593,19 @@ display(df_pipelines)
 
 # MAGIC %md
 # MAGIC ## Next Steps
-# MAGIC 
+# MAGIC
 # MAGIC 1. **Monitor Pipeline Execution**
 # MAGIC    - Go to Workflows → Jobs to view execution status
 # MAGIC    - Check Delta Live Tables UI for data quality metrics
-# MAGIC 
+# MAGIC
 # MAGIC 2. **Query Risk Analytics**
 # MAGIC    - Use SQL cells above to query `demo_hc.risk_analytics.*` tables
 # MAGIC    - Create dashboards with Databricks SQL
-# MAGIC 
+# MAGIC
 # MAGIC 3. **Set Up Alerts**
 # MAGIC    - Configure email notifications for high-risk locations
 # MAGIC    - Set up Slack/webhook integrations
-# MAGIC 
+# MAGIC
 # MAGIC 4. **Optimize Performance**
 # MAGIC    - Review execution times
 # MAGIC    - Adjust cluster sizes if needed
