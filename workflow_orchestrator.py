@@ -1,19 +1,26 @@
-"""
-European Climate Risk Pipeline Orchestrator
-============================================
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # European Climate Risk Pipeline Orchestrator
+# MAGIC 
+# MAGIC This notebook orchestrates the execution of all European climate risk data pipelines using Databricks Workflows and Delta Live Tables.
+# MAGIC 
+# MAGIC ## Pipelines Managed
+# MAGIC 
+# MAGIC 1. **Terrain/DEM Ingestion** - Copernicus, EEA, OpenGeoHub, GeoHarmonizer
+# MAGIC 2. **AccuWeather European Locations Ingestion** - Real-time weather data
+# MAGIC 3. **Flood Risk Transformation** - Risk scoring and evacuation zones
+# MAGIC 4. **Drought Risk Transformation** - Drought indices and impact assessment
+# MAGIC 
+# MAGIC **Author:** Climate Risk Analytics Team  
+# MAGIC **Date:** 2025-11-12  
+# MAGIC **Catalog:** demo_hc
 
-This script orchestrates the execution of all European climate risk data pipelines
-using Databricks Workflows and Delta Live Tables.
+# COMMAND ----------
 
-Pipelines:
-1. Terrain/DEM Ingestion (Copernicus, EEA, OpenGeoHub, GeoHarmonizer)
-2. AccuWeather European Locations Ingestion
-3. Flood Risk Transformation
-4. Drought Risk Transformation
+# MAGIC %md
+# MAGIC ## Imports and Setup
 
-Author: Climate Risk Analytics Team
-Date: 2025-11-12
-"""
+# COMMAND ----------
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs, pipelines
@@ -21,6 +28,14 @@ from datetime import datetime
 import yaml
 import json
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## EuropeanRiskPipelineOrchestrator Class
+# MAGIC 
+# MAGIC Main orchestrator class for managing all climate risk pipelines.
+
+# COMMAND ----------
 
 class EuropeanRiskPipelineOrchestrator:
     """
@@ -398,24 +413,194 @@ class EuropeanRiskPipelineOrchestrator:
                 "error": str(e)
             }
 
+# COMMAND ----------
 
-def main():
-    """
-    Main entry point for pipeline orchestration.
-    """
-    # Initialize orchestrator
-    orchestrator = EuropeanRiskPipelineOrchestrator()
-    
-    # Deploy all pipelines
-    deployment_result = orchestrator.deploy_all_pipelines()
-    
-    # Save deployment info
-    with open("deployment_info.json", "w") as f:
-        json.dump(deployment_result, f, indent=2)
-    
-    print("\nDeployment information saved to: deployment_info.json")
+# MAGIC %md
+# MAGIC ## Deployment Functions
+# MAGIC 
+# MAGIC Use these functions to deploy and manage the climate risk pipelines.
 
+# COMMAND ----------
 
-if __name__ == "__main__":
-    main()
+# MAGIC %md
+# MAGIC ### Option 1: Deploy All Pipelines (Recommended)
+# MAGIC 
+# MAGIC This will:
+# MAGIC 1. Set up Unity Catalog schemas
+# MAGIC 2. Create all 4 DLT pipelines
+# MAGIC 3. Create orchestration workflow
+# MAGIC 4. Configure schedules
 
+# COMMAND ----------
+
+# Initialize orchestrator
+orchestrator = EuropeanRiskPipelineOrchestrator()
+
+# Deploy all pipelines
+deployment_result = orchestrator.deploy_all_pipelines()
+
+# Display results
+print("\n" + "="*80)
+print("DEPLOYMENT COMPLETE")
+print("="*80)
+displayHTML(f"""
+<h2>✅ Pipeline Deployment Successful!</h2>
+<table style="border-collapse: collapse; width: 100%;">
+  <tr style="background-color: #f2f2f2;">
+    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Component</th>
+    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Details</th>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ddd; padding: 8px;"><strong>Catalog</strong></td>
+    <td style="border: 1px solid #ddd; padding: 8px;">{deployment_result['catalog']}</td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ddd; padding: 8px;"><strong>Pipelines Created</strong></td>
+    <td style="border: 1px solid #ddd; padding: 8px;">{len(deployment_result['pipeline_ids'])}</td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ddd; padding: 8px;"><strong>Workflow Job ID</strong></td>
+    <td style="border: 1px solid #ddd; padding: 8px;">{deployment_result.get('job_id', 'N/A')}</td>
+  </tr>
+</table>
+<br>
+<h3>Pipeline IDs:</h3>
+<ul>
+  {''.join([f"<li><strong>{name}:</strong> {pid}</li>" for name, pid in deployment_result['pipeline_ids'].items()])}
+</ul>
+""")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Option 2: Check Pipeline Status
+# MAGIC 
+# MAGIC Query the status of a specific pipeline.
+
+# COMMAND ----------
+
+# Example: Check status of a pipeline
+# Uncomment and replace with actual pipeline ID
+# pipeline_id = "your-pipeline-id-here"
+# status = orchestrator.get_pipeline_status(pipeline_id)
+# print(json.dumps(status, indent=2))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Option 3: Manually Trigger a Pipeline
+# MAGIC 
+# MAGIC Trigger a specific pipeline on demand.
+
+# COMMAND ----------
+
+# Example: Manually trigger a pipeline
+# Uncomment to use
+# orchestrator.run_pipeline("terrain_ingestion")
+# orchestrator.run_pipeline("weather_ingestion")
+# orchestrator.run_pipeline("flood_risk")
+# orchestrator.run_pipeline("drought_risk")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Save Deployment Information
+
+# COMMAND ----------
+
+# Save deployment info to JSON
+with open("/dbfs/FileStore/risk_app/deployment_info.json", "w") as f:
+    json.dump(deployment_result, f, indent=2)
+
+print("✓ Deployment information saved to: /dbfs/FileStore/risk_app/deployment_info.json")
+
+# Display as DataFrame for easy viewing
+import pandas as pd
+df_pipelines = pd.DataFrame([
+    {"Pipeline": name, "Pipeline ID": pid}
+    for name, pid in deployment_result['pipeline_ids'].items()
+])
+display(df_pipelines)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Query Risk Data
+# MAGIC 
+# MAGIC Once pipelines have run, you can query the risk analytics data.
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Show all catalogs
+# MAGIC SHOW CATALOGS;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Show schemas in demo_hc catalog
+# MAGIC SHOW SCHEMAS IN demo_hc;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Example: Query flood risk scores (once data is available)
+# MAGIC -- SELECT 
+# MAGIC --   location_name,
+# MAGIC --   country_code,
+# MAGIC --   flood_risk_score,
+# MAGIC --   flood_risk_category,
+# MAGIC --   evacuation_zone_area_km2
+# MAGIC -- FROM demo_hc.risk_analytics.gold_flood_risk_scores
+# MAGIC -- WHERE flood_risk_category IN ('CRITICAL', 'HIGH')
+# MAGIC -- ORDER BY flood_risk_score DESC
+# MAGIC -- LIMIT 10;
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Pipeline Architecture
+# MAGIC 
+# MAGIC ```
+# MAGIC Data Sources → Ingestion (Bronze) → Processing (Silver) → Analytics (Gold)
+# MAGIC      ↓              ↓                      ↓                    ↓
+# MAGIC   Terrain         Raw TIFF           Unified terrain        Risk scores
+# MAGIC   Weather         Raw API data       Enriched weather       Alerts
+# MAGIC   Satellite       Quality checks     H3 indexing            Time series
+# MAGIC                                      ST functions           Summaries
+# MAGIC ```
+# MAGIC 
+# MAGIC ### Pipelines:
+# MAGIC 1. **Terrain Ingestion** (Weekly) - Copernicus, EEA, OpenGeoHub, GeoHarmonizer
+# MAGIC 2. **Weather Ingestion** (Hourly) - AccuWeather API for 15 European capitals
+# MAGIC 3. **Flood Risk** (Hourly) - Risk scoring, evacuation zones, alerts
+# MAGIC 4. **Drought Risk** (Daily) - SPI, SPEI, SMI indices, restriction zones
+# MAGIC 
+# MAGIC ### Features:
+# MAGIC - ✅ H3 hexagonal spatial indexing
+# MAGIC - ✅ ST geospatial functions (buffers, distances, areas)
+# MAGIC - ✅ Delta Live Tables with quality expectations
+# MAGIC - ✅ Unity Catalog (demo_hc)
+# MAGIC - ✅ 28 Delta tables across Bronze-Silver-Gold architecture
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Next Steps
+# MAGIC 
+# MAGIC 1. **Monitor Pipeline Execution**
+# MAGIC    - Go to Workflows → Jobs to view execution status
+# MAGIC    - Check Delta Live Tables UI for data quality metrics
+# MAGIC 
+# MAGIC 2. **Query Risk Analytics**
+# MAGIC    - Use SQL cells above to query `demo_hc.risk_analytics.*` tables
+# MAGIC    - Create dashboards with Databricks SQL
+# MAGIC 
+# MAGIC 3. **Set Up Alerts**
+# MAGIC    - Configure email notifications for high-risk locations
+# MAGIC    - Set up Slack/webhook integrations
+# MAGIC 
+# MAGIC 4. **Optimize Performance**
+# MAGIC    - Review execution times
+# MAGIC    - Adjust cluster sizes if needed
+# MAGIC    - Enable auto-optimization on tables
