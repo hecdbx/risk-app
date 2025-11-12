@@ -153,28 +153,21 @@ Create a notebook in Databricks and run:
 CREATE CATALOG IF NOT EXISTS demo_hc
 COMMENT 'European Climate Risk Data - Flood and Drought Analysis';
 
--- Create schemas
-CREATE SCHEMA IF NOT EXISTS demo_hc.raw_data
-COMMENT 'Raw data from external sources (Bronze layer)';
-
-CREATE SCHEMA IF NOT EXISTS demo_hc.processed_data
-COMMENT 'Processed and enriched data (Silver layer)';
-
-CREATE SCHEMA IF NOT EXISTS demo_hc.risk_analytics
-COMMENT 'Risk scores and analytics (Gold layer)';
+-- Create single unified schema
+CREATE SCHEMA IF NOT EXISTS demo_hc.climate_risk
+COMMENT 'Climate Risk Data - Unified schema for all layers (Bronze, Silver, Gold)';
 
 -- Set as default
 USE CATALOG demo_hc;
+USE SCHEMA climate_risk;
 
 -- Grant permissions (adjust as needed)
 GRANT USE CATALOG ON CATALOG demo_hc TO `data_engineers`;
-GRANT ALL PRIVILEGES ON SCHEMA demo_hc.raw_data TO `data_engineers`;
-GRANT ALL PRIVILEGES ON SCHEMA demo_hc.processed_data TO `data_engineers`;
-GRANT ALL PRIVILEGES ON SCHEMA demo_hc.risk_analytics TO `data_engineers`;
+GRANT ALL PRIVILEGES ON SCHEMA demo_hc.climate_risk TO `data_engineers`;
 
 -- Grant read access to analysts
 GRANT USE CATALOG ON CATALOG demo_hc TO `analysts`;
-GRANT SELECT ON SCHEMA demo_hc.risk_analytics TO `analysts`;
+GRANT SELECT ON SCHEMA demo_hc.climate_risk TO `analysts`;
 ```
 
 ---

@@ -578,7 +578,7 @@ flood_risk = spark.sql("""
     evacuation_zone_geojson,
     immediate_alert,
     observation_time
-  FROM demo_hc.risk_analytics.gold_flood_risk_scores
+  FROM demo_hc.climate_risk.gold_flood_risk_scores
   WHERE country_code = 'FR'
     AND observation_time >= current_timestamp() - INTERVAL 24 HOURS
   ORDER BY flood_risk_score DESC
@@ -590,7 +590,7 @@ nearby_risks = spark.sql("""
     location_name,
     flood_risk_score,
     ST_DISTANCE(geom_point, ST_POINT(2.3522, 48.8566)) / 1000.0 as distance_from_paris_km
-  FROM demo_hc.risk_analytics.gold_flood_risk_scores
+  FROM demo_hc.climate_risk.gold_flood_risk_scores
   WHERE ST_DWITHIN(geom_point, ST_POINT(2.3522, 48.8566), 100000.0)
   ORDER BY distance_from_paris_km
 """)

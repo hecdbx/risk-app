@@ -287,8 +287,8 @@ SELECT
   b.location_name as city_b,
   ST_INTERSECTION(a.evacuation_zone, b.evacuation_zone) as overlap_zone,
   ST_AREA(ST_INTERSECTION(a.evacuation_zone, b.evacuation_zone)) / 1000000.0 as overlap_area_km2
-FROM demo_hc.risk_analytics.gold_flood_risk_scores a
-INNER JOIN demo_hc.risk_analytics.gold_flood_risk_scores b
+FROM demo_hc.climate_risk.gold_flood_risk_scores a
+INNER JOIN demo_hc.climate_risk.gold_flood_risk_scores b
   ON a.h3_cell != b.h3_cell
   AND ST_INTERSECTS(a.evacuation_zone, b.evacuation_zone)
 WHERE a.flood_risk_category IN ('CRITICAL', 'HIGH')
@@ -305,7 +305,7 @@ SELECT
   f.flood_risk_category,
   f.evacuation_zone_area_km2,
   SUM(c.population) as estimated_population_at_risk
-FROM demo_hc.risk_analytics.gold_flood_risk_scores f
+FROM demo_hc.climate_risk.gold_flood_risk_scores f
 LEFT JOIN census_data c
   ON ST_INTERSECTS(f.evacuation_zone, c.geom_boundary)
 WHERE f.immediate_alert = true
@@ -322,7 +322,7 @@ WITH stations AS (
     location_name,
     geom_point,
     country_code
-  FROM demo_hc.processed_data.silver_weather_europe_enriched
+  FROM demo_hc.climate_risk.silver_weather_europe_enriched
 ),
 risk_locations AS (
   SELECT
@@ -330,7 +330,7 @@ risk_locations AS (
     location_name as risk_location,
     geom_point,
     flood_risk_score
-  FROM demo_hc.risk_analytics.gold_flood_risk_scores
+  FROM demo_hc.climate_risk.gold_flood_risk_scores
   WHERE flood_risk_score >= 60
 )
 SELECT
@@ -353,10 +353,10 @@ SELECT
   t.avg_elevation_m,
   COUNT(f.h3_cell) as nearby_critical_flood_zones,
   MIN(ST_DISTANCE(t.geom_point, f.geom_point)) / 1000.0 as distance_to_nearest_critical_km
-FROM demo_hc.processed_data.silver_terrain_unified t
+FROM demo_hc.climate_risk.silver_terrain_unified t
 CROSS JOIN (
   SELECT h3_cell, geom_point 
-  FROM demo_hc.risk_analytics.gold_flood_risk_scores
+  FROM demo_hc.climate_risk.gold_flood_risk_scores
   WHERE flood_risk_category = 'CRITICAL'
 ) f
 WHERE ST_DWITHIN(t.geom_point, f.geom_point, 10000.0)
@@ -378,7 +378,7 @@ SELECT
   evacuation_zone_area_km2,
   recommended_action,
   observation_time
-FROM demo_hc.risk_analytics.gold_flood_high_risk_alerts
+FROM demo_hc.climate_risk.gold_flood_high_risk_alerts
 WHERE immediate_alert = true
 ORDER BY flood_risk_score DESC;
 ```
@@ -396,7 +396,7 @@ SELECT
   ST_UNION_AGG(d.restriction_zone) as combined_restriction_zone,
   ST_AREA(ST_UNION_AGG(d.restriction_zone)) / 1000000.0 as combined_zone_area_km2
 FROM admin_boundaries a
-INNER JOIN demo_hc.risk_analytics.gold_drought_risk_scores d
+INNER JOIN demo_hc.climate_risk.gold_drought_risk_scores d
   ON ST_CONTAINS(a.boundary_geom, d.geom_point)
 WHERE d.drought_risk_category IN ('EXTREME', 'SEVERE')
 GROUP BY a.region_name, a.country_code
@@ -466,7 +466,7 @@ flood_alerts = spark.sql("""
     ST_Y(geom_point) as latitude,
     ST_X(geom_point) as longitude,
     evacuation_zone_geojson
-  FROM demo_hc.risk_analytics.gold_flood_high_risk_alerts
+  FROM demo_hc.climate_risk.gold_flood_high_risk_alerts
   WHERE immediate_alert = true
 """).toPandas()
 
@@ -511,7 +511,7 @@ m.save('flood_risk_map.html')
 2. **Create Spatial Indices**
    ```sql
    -- Z-order by geometry bounds for faster spatial queries
-   OPTIMIZE demo_hc.risk_analytics.gold_flood_risk_scores
+   OPTIMIZE demo_hc.climate_risk.gold_flood_risk_scores
    ZORDER BY (h3_cell_8, ST_XMIN(geom_point), ST_YMIN(geom_point));
    ```
 

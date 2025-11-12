@@ -728,7 +728,7 @@ def gold_terrain_quality_metrics():
 # MAGIC 
 # MAGIC **Execution Mode:** Triggered or Scheduled
 # MAGIC **Schedule:** Weekly (terrain data is relatively static)
-# MAGIC **Target:** Unity Catalog - `demo_hc.processed_data`
+# MAGIC **Target:** Unity Catalog - `demo_hc.climate_risk`
 # MAGIC 
 # MAGIC **Storage:**
 # MAGIC - Raw TIFF files: `/mnt/european-climate-risk/raw/`

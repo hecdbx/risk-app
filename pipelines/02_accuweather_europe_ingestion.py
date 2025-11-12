@@ -618,7 +618,7 @@ def gold_weather_pipeline_metrics():
 # MAGIC 
 # MAGIC **Execution Mode:** Triggered or Scheduled
 # MAGIC **Schedule:** Hourly (for real-time weather monitoring)
-# MAGIC **Target:** Unity Catalog - `demo_hc.processed_data`
+# MAGIC **Target:** Unity Catalog - `demo_hc.climate_risk`
 # MAGIC 
 # MAGIC **API Configuration:**
 # MAGIC - Rate Limit: 50 calls/minute (free tier) or 25,000 calls/day (standard)

@@ -769,7 +769,7 @@ def gold_drought_risk_quality_metrics():
 # MAGIC 
 # MAGIC **Execution Mode:** Scheduled
 # MAGIC **Schedule:** Daily (drought develops slowly, daily updates sufficient)
-# MAGIC **Target:** Unity Catalog - `demo_hc.risk_analytics`
+# MAGIC **Target:** Unity Catalog - `demo_hc.climate_risk`
 # MAGIC 
 # MAGIC **Dependencies:**
 # MAGIC - `gold_terrain_features_drought_risk`

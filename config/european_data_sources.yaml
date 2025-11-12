@@ -284,10 +284,7 @@ processing_config:
     
   unity_catalog:
     catalog: "demo_hc"
-    schemas:
-      raw: "raw_data"
-      processed: "processed_data"
-      analytics: "risk_analytics"
+    schema: "climate_risk"  # Single unified schema for all layers
       
 # Risk Model Parameters
 risk_parameters:

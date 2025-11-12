@@ -545,7 +545,7 @@ def gold_flood_risk_quality_metrics():
 # MAGIC 
 # MAGIC **Execution Mode:** Scheduled
 # MAGIC **Schedule:** Hourly (aligned with weather data updates)
-# MAGIC **Target:** Unity Catalog - `demo_hc.risk_analytics`
+# MAGIC **Target:** Unity Catalog - `demo_hc.climate_risk`
 # MAGIC 
 # MAGIC **Dependencies:**
 # MAGIC - `gold_terrain_features_flood_risk`

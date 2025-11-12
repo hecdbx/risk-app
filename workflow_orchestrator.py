@@ -61,11 +61,7 @@ class EuropeanRiskPipelineOrchestrator:
             # Default configuration
             return {
                 "catalog": "demo_hc",
-                "schemas": {
-                    "raw_data": "raw_data",
-                    "processed_data": "processed_data",
-                    "risk_analytics": "risk_analytics"
-                },
+                "schema": "climate_risk",  # Single unified schema
                 "pipelines": {
                     "terrain_ingestion": {
                         "name": "european_terrain_dem_ingestion",
@@ -79,16 +75,10 @@ class EuropeanRiskPipelineOrchestrator:
                         "schedule": "0 0 * * * ?",  # Hourly (Quartz format)
                         "cluster_size": "Small"
                     },
-                    "flood_risk": {
-                        "name": "flood_risk_transformation",
-                        "notebook": "/Workspace/Shared/risk_app/pipelines/03_flood_risk_transformation",
+                    "risk_transformation": {
+                        "name": "climate_risk_transformation",
+                        "notebook": "/Workspace/Shared/risk_app/pipelines/03_climate_risk_transformation",
                         "schedule": "0 15 * * * ?",  # Hourly at :15 (Quartz format)
-                        "cluster_size": "Medium"
-                    },
-                    "drought_risk": {
-                        "name": "drought_risk_transformation",
-                        "notebook": "/Workspace/Shared/risk_app/pipelines/04_drought_risk_transformation",
-                        "schedule": "0 0 6 * * ?",  # Daily at 6 AM (Quartz format)
                         "cluster_size": "Medium"
                     }
                 }
@@ -151,7 +141,7 @@ class EuropeanRiskPipelineOrchestrator:
                     "pipelines.applyChangesPreviewEnabled": "true",
                     "pipelines.useSharedClusters": "false"
                 },
-                target=f"{self.config['catalog']}.{self.config['schemas']['processed_data']}",
+                target=f"{self.config['catalog']}.{self.config['schema']}",
                 continuous=False,
                 development=False,
                 photon=True,
@@ -207,37 +197,20 @@ class EuropeanRiskPipelineOrchestrator:
                 )
             )
         
-        # Task 3: Flood risk transformation
-        if "flood_risk" in pipeline_ids:
+        # Task 3: Combined climate risk transformation (flood + drought)
+        if "risk_transformation" in pipeline_ids:
             tasks.append(
                 jobs.Task(
-                    task_key="flood_risk_transformation",
+                    task_key="climate_risk_transformation",
                     pipeline_task=jobs.PipelineTask(
-                        pipeline_id=pipeline_ids["flood_risk"],
+                        pipeline_id=pipeline_ids["risk_transformation"],
                         full_refresh=False
                     ),
                     depends_on=[
                         jobs.TaskDependency(task_key="terrain_ingestion"),
                         jobs.TaskDependency(task_key="weather_ingestion")
                     ],
-                    timeout_seconds=3600
-                )
-            )
-        
-        # Task 4: Drought risk transformation
-        if "drought_risk" in pipeline_ids:
-            tasks.append(
-                jobs.Task(
-                    task_key="drought_risk_transformation",
-                    pipeline_task=jobs.PipelineTask(
-                        pipeline_id=pipeline_ids["drought_risk"],
-                        full_refresh=False
-                    ),
-                    depends_on=[
-                        jobs.TaskDependency(task_key="terrain_ingestion"),
-                        jobs.TaskDependency(task_key="weather_ingestion")
-                    ],
-                    timeout_seconds=3600
+                    timeout_seconds=7200  # 2 hours (combined flood + drought)
                 )
             )
         
@@ -280,7 +253,7 @@ class EuropeanRiskPipelineOrchestrator:
         print("="*80)
         
         catalog = self.config["catalog"]
-        schemas = self.config["schemas"]
+        schema = self.config["schema"]
         
         # SQL commands to execute
         sql_commands = [
@@ -288,18 +261,13 @@ class EuropeanRiskPipelineOrchestrator:
             f"CREATE CATALOG IF NOT EXISTS {catalog}",
             f"COMMENT ON CATALOG {catalog} IS 'European Climate Risk Data - Flood and Drought Analysis'",
             
-            # Create schemas
-            f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schemas['raw_data']}",
-            f"COMMENT ON SCHEMA {catalog}.{schemas['raw_data']} IS 'Raw data from external sources (Bronze layer)'",
+            # Create single unified schema
+            f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}",
+            f"COMMENT ON SCHEMA {catalog}.{schema} IS 'Unified climate risk data - All layers (Bronze, Silver, Gold)'",
             
-            f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schemas['processed_data']}",
-            f"COMMENT ON SCHEMA {catalog}.{schemas['processed_data']} IS 'Processed and enriched data (Silver layer)'",
-            
-            f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schemas['risk_analytics']}",
-            f"COMMENT ON SCHEMA {catalog}.{schemas['risk_analytics']} IS 'Risk scores and analytics (Gold layer)'",
-            
-            # Set default catalog
-            f"USE CATALOG {catalog}"
+            # Set default catalog and schema
+            f"USE CATALOG {catalog}",
+            f"USE SCHEMA {schema}"
         ]
         
         print("\nExecuting Unity Catalog setup commands...")
@@ -490,8 +458,7 @@ displayHTML(f"""
 # Uncomment to use
 # orchestrator.run_pipeline("terrain_ingestion")
 # orchestrator.run_pipeline("weather_ingestion")
-# orchestrator.run_pipeline("flood_risk")
-# orchestrator.run_pipeline("drought_risk")
+# orchestrator.run_pipeline("risk_transformation")
 
 # COMMAND ----------
 
@@ -544,8 +511,11 @@ display(df_pipelines)
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Show schemas in demo_hc catalog
+# MAGIC -- Show schema in demo_hc catalog
 # MAGIC SHOW SCHEMAS IN demo_hc;
+# MAGIC 
+# MAGIC -- Show tables in climate_risk schema
+# MAGIC SHOW TABLES IN demo_hc.climate_risk;
 
 # COMMAND ----------
 
@@ -557,7 +527,7 @@ display(df_pipelines)
 # MAGIC --   flood_risk_score,
 # MAGIC --   flood_risk_category,
 # MAGIC --   evacuation_zone_area_km2
-# MAGIC -- FROM demo_hc.risk_analytics.gold_flood_risk_scores
+# MAGIC -- FROM demo_hc.climate_risk.gold_flood_risk_scores
 # MAGIC -- WHERE flood_risk_category IN ('CRITICAL', 'HIGH')
 # MAGIC -- ORDER BY flood_risk_score DESC
 # MAGIC -- LIMIT 10;
@@ -579,8 +549,7 @@ display(df_pipelines)
 # MAGIC ### Pipelines:
 # MAGIC 1. **Terrain Ingestion** (Weekly) - Copernicus, EEA, OpenGeoHub, GeoHarmonizer
 # MAGIC 2. **Weather Ingestion** (Hourly) - AccuWeather API for 15 European capitals
-# MAGIC 3. **Flood Risk** (Hourly) - Risk scoring, evacuation zones, alerts
-# MAGIC 4. **Drought Risk** (Daily) - SPI, SPEI, SMI indices, restriction zones
+# MAGIC 3. **Climate Risk Transformation** (Hourly) - Combined flood and drought risk analytics with scoring, zones, and alerts
 # MAGIC
 # MAGIC ### Features:
 # MAGIC - ✅ H3 hexagonal spatial indexing

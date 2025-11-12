@@ -292,7 +292,7 @@ result = orchestrator.deploy_all_pipelines()
 ### 2. Query Flood Risk (Real-time)
 ```sql
 SELECT location_name, flood_risk_score, flood_risk_category
-FROM demo_hc.risk_analytics.gold_flood_risk_scores
+FROM demo_hc.climate_risk.gold_flood_risk_scores
 WHERE flood_risk_category IN ('CRITICAL', 'HIGH')
 ORDER BY flood_risk_score DESC;
 ```
@@ -300,7 +300,7 @@ ORDER BY flood_risk_score DESC;
 ### 3. Query Drought Risk (Latest)
 ```sql
 SELECT location_name, drought_risk_score, spi_30d, smi
-FROM demo_hc.risk_analytics.gold_drought_risk_scores
+FROM demo_hc.climate_risk.gold_drought_risk_scores
 WHERE drought_risk_category IN ('EXTREME', 'SEVERE')
 ORDER BY drought_risk_score DESC;
 ```
