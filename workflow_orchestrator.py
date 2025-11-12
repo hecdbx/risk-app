@@ -65,19 +65,19 @@ class EuropeanRiskPipelineOrchestrator:
                 "pipelines": {
                     "terrain_ingestion": {
                         "name": "european_terrain_dem_ingestion",
-                        "notebook": "/Workspace/Shared/risk_app/pipelines/01_terrain_dem_ingestion",
+                        "notebook": "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/pipelines/01_terrain_dem_ingestion",
                         "schedule": "0 0 0 ? * SUN",  # Weekly on Sunday (Quartz format)
                         "cluster_size": "Medium"
                     },
                     "weather_ingestion": {
                         "name": "accuweather_europe_ingestion",
-                        "notebook": "/Workspace/Shared/risk_app/pipelines/02_accuweather_europe_ingestion",
+                        "notebook": "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/pipelines/02_accuweather_europe_ingestion",
                         "schedule": "0 0 * * * ?",  # Hourly (Quartz format)
                         "cluster_size": "Small"
                     },
                     "risk_transformation": {
                         "name": "climate_risk_transformation",
-                        "notebook": "/Workspace/Shared/risk_app/pipelines/03_climate_risk_transformation",
+                        "notebook": "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/pipelines/03_climate_risk_transformation",
                         "schedule": "0 15 * * * ?",  # Hourly at :15 (Quartz format)
                         "cluster_size": "Medium"
                     }
@@ -467,33 +467,19 @@ displayHTML(f"""
 
 # COMMAND ----------
 
-import os
 import pandas as pd
 
-# Use Unity Catalog volume for secure file storage
-volume_path = "/Volumes/demo_hc/risk_analytics/deployment_files"
+print("Deployment info:")
+print(json.dumps(deployment_result, indent=2))
 
-# Create directory if it doesn't exist
-try:
-    os.makedirs(volume_path, exist_ok=True)
-    
-    # Save deployment info to JSON in volume
-    file_path = f"{volume_path}/deployment_info.json"
-    with open(file_path, "w") as f:
-        json.dump(deployment_result, f, indent=2)
-    
-    print(f"✓ Deployment information saved to volume: {file_path}")
-except Exception as e:
-    print(f"Note: Could not save to volume (volume may not exist): {e}")
-    print("Deployment info (in memory):")
-    print(json.dumps(deployment_result, indent=2))
-
-# Display as DataFrame for easy viewing
-df_pipelines = pd.DataFrame([
-    {"Pipeline": name, "Pipeline ID": pid}
-    for name, pid in deployment_result['pipeline_ids'].items()
-])
-display(df_pipelines)
+if deployment_result.get('pipeline_ids') and len(deployment_result['pipeline_ids']) > 0:
+    df_pipelines = pd.DataFrame([
+        {"Pipeline": name, "Pipeline ID": pid}
+        for name, pid in deployment_result['pipeline_ids'].items()
+    ])
+    display(df_pipelines)
+else:
+    print("No pipelines were created successfully.")
 
 # COMMAND ----------
 
@@ -513,7 +499,7 @@ display(df_pipelines)
 # MAGIC %sql
 # MAGIC -- Show schema in demo_hc catalog
 # MAGIC SHOW SCHEMAS IN demo_hc;
-# MAGIC 
+# MAGIC
 # MAGIC -- Show tables in climate_risk schema
 # MAGIC SHOW TABLES IN demo_hc.climate_risk;
 

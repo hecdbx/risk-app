@@ -25,6 +25,13 @@ CREATE SCHEMA IF NOT EXISTS climate_risk
 COMMENT 'Climate Risk Data - Unified schema for all layers (Bronze: raw data, Silver: processed, Gold: analytics)';
 
 -- ============================================================================
+-- STEP 2.1: Create Managed Volume for Raw Data
+-- ============================================================================
+
+CREATE VOLUME IF NOT EXISTS demo_hc.climate_risk.risk_raw_volume
+COMMENT 'Managed volume for storing raw climate risk data';
+
+-- ============================================================================
 -- STEP 3: Set Schema Properties
 -- ============================================================================
 
@@ -88,7 +95,7 @@ COMMENT 'Data quality check results over time';
 
 -- Tag catalog
 ALTER CATALOG demo_hc 
-SET TAGS ('domain' = 'climate_risk', 'project' = 'flood_drought_assessment');
+SET TAGS ('domain' = 'data', 'project' = 'flood_drought_assessment');
 
 -- Tag schema
 ALTER SCHEMA climate_risk 
