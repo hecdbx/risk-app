@@ -25,8 +25,17 @@
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs, pipelines
 from datetime import datetime
-import yaml
 import json
+
+# Optional yaml import for configuration files
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+    print("Note: yaml module not available. Using default configuration only.")
+
+print("✅ Imports loaded successfully for serverless DLT pipelines")
 
 # COMMAND ----------
 
@@ -39,7 +48,7 @@ import json
 
 class EuropeanRiskPipelineOrchestrator:
     """
-    Orchestrator for European climate risk data pipelines.
+    Orchestrator for European climate risk data pipelines using Serverless compute.
     """
     
     def __init__(self, config_path: str = None):
@@ -54,39 +63,57 @@ class EuropeanRiskPipelineOrchestrator:
         
     def _load_config(self, config_path: str = None) -> dict:
         """Load configuration from YAML file."""
-        if config_path:
+        if config_path and YAML_AVAILABLE:
             with open(config_path, 'r') as f:
                 return yaml.safe_load(f)
         else:
-            # Default configuration
+            # Default configuration for serverless pipelines
             return {
                 "catalog": "demo_hc",
                 "schema": "climate_risk",  # Single unified schema
+                "serverless": True,  # Enable serverless compute
                 "pipelines": {
                     "terrain_ingestion": {
                         "name": "european_terrain_dem_ingestion",
                         "notebook": "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/pipelines/01_terrain_dem_ingestion",
                         "schedule": "0 0 0 ? * SUN",  # Weekly on Sunday (Quartz format)
-                        "cluster_size": "Medium"
+                        "libraries": [
+                            "rasterio",
+                            "geopandas", 
+                            "h3",
+                            "pyyaml",
+                            "rasterframes"
+                        ]
                     },
                     "weather_ingestion": {
                         "name": "accuweather_europe_ingestion",
                         "notebook": "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/pipelines/02_accuweather_europe_ingestion",
                         "schedule": "0 0 * * * ?",  # Hourly (Quartz format)
-                        "cluster_size": "Small"
+                        "libraries": [
+                            "requests",
+                            "pandas",
+                            "h3",
+                            "pyyaml"
+                        ]
                     },
                     "risk_transformation": {
                         "name": "climate_risk_transformation",
                         "notebook": "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/pipelines/03_climate_risk_transformation",
                         "schedule": "0 15 * * * ?",  # Hourly at :15 (Quartz format)
-                        "cluster_size": "Medium"
+                        "libraries": [
+                            "geopandas",
+                            "h3",
+                            "scikit-learn",
+                            "numpy",
+                            "pandas"
+                        ]
                     }
                 }
             }
     
     def create_dlt_pipeline(self, pipeline_config: dict) -> str:
         """
-        Create a Delta Live Tables pipeline.
+        Create a Delta Live Tables pipeline with serverless compute and pre-configured libraries.
         
         Args:
             pipeline_config: Pipeline configuration dictionary
@@ -94,49 +121,35 @@ class EuropeanRiskPipelineOrchestrator:
         Returns:
             Pipeline ID
         """
-        print(f"Creating DLT pipeline: {pipeline_config['name']}")
+        print(f"Creating Serverless DLT pipeline: {pipeline_config['name']}")
         
-        # Define cluster configuration based on size
-        cluster_configs = {
-            "Small": {
-                "num_workers": 2,
-                "node_type_id": "Standard_DS3_v2"
-            },
-            "Medium": {
-                "num_workers": 4,
-                "node_type_id": "Standard_DS4_v2"
-            },
-            "Large": {
-                "num_workers": 8,
-                "node_type_id": "Standard_DS5_v2"
-            }
-        }
+        # Prepare libraries list
+        libraries = [
+            # Notebook library
+            pipelines.PipelineLibrary(
+                notebook=pipelines.NotebookLibrary(
+                    path=pipeline_config["notebook"]
+                )
+            )
+        ]
         
-        cluster_size = pipeline_config.get("cluster_size", "Medium")
-        cluster_config = cluster_configs[cluster_size]
+        # Add PyPI libraries if specified
+        if "libraries" in pipeline_config:
+            for lib_name in pipeline_config["libraries"]:
+                libraries.append(
+                    pipelines.PipelineLibrary(
+                        pypi=lib_name
+                    )
+                )
+            print(f"  📦 Adding PyPI libraries: {', '.join(pipeline_config['libraries'])}")
         
-        # Create pipeline specification using correct SDK structure
+        # Create serverless pipeline specification
         try:
             response = self.workspace.pipelines.create(
                 name=pipeline_config["name"],
-                libraries=[
-                    pipelines.PipelineLibrary(
-                        notebook=pipelines.NotebookLibrary(
-                            path=pipeline_config["notebook"]
-                        )
-                    )
-                ],
-                clusters=[
-                    pipelines.PipelineCluster(
-                        label="default",
-                        num_workers=cluster_config["num_workers"],
-                        node_type_id=cluster_config["node_type_id"],
-                        custom_tags={
-                            "project": "european_climate_risk",
-                            "pipeline": pipeline_config["name"]
-                        }
-                    )
-                ],
+                libraries=libraries,
+                # No clusters configuration for serverless
+                clusters=None,
                 configuration={
                     "pipelines.applyChangesPreviewEnabled": "true",
                     "pipelines.useSharedClusters": "false"
@@ -145,18 +158,20 @@ class EuropeanRiskPipelineOrchestrator:
                 continuous=False,
                 development=False,
                 photon=True,
-                channel="CURRENT"
+                channel="CURRENT",
+                serverless=True,  # Enable serverless compute
+                edition="ADVANCED"  # Required for serverless
             )
             pipeline_id = response.pipeline_id
-            print(f"✓ Pipeline created successfully: {pipeline_id}")
+            print(f"✓ Serverless pipeline created successfully: {pipeline_id}")
             return pipeline_id
         except Exception as e:
-            print(f"✗ Error creating pipeline: {str(e)}")
+            print(f"✗ Error creating serverless pipeline: {str(e)}")
             return None
     
     def create_workflow_job(self, job_name: str, pipeline_ids: dict) -> str:
         """
-        Create a Databricks Workflow that orchestrates multiple DLT pipelines.
+        Create a Databricks Workflow that orchestrates multiple serverless DLT pipelines.
         
         Args:
             job_name: Name of the workflow job
@@ -165,7 +180,7 @@ class EuropeanRiskPipelineOrchestrator:
         Returns:
             Job ID
         """
-        print(f"\nCreating workflow job: {job_name}")
+        print(f"\nCreating workflow job for serverless pipelines: {job_name}")
         
         # Define tasks
         tasks = []
@@ -219,7 +234,7 @@ class EuropeanRiskPipelineOrchestrator:
             response = self.workspace.jobs.create(
                 name=job_name,
                 tasks=tasks,
-                job_clusters=[],
+                job_clusters=[],  # No job clusters needed for serverless
                 schedule=jobs.CronSchedule(
                     quartz_cron_expression="0 0 * * * ?",  # Hourly using Quartz format
                     timezone_id="UTC",
@@ -234,14 +249,15 @@ class EuropeanRiskPipelineOrchestrator:
                 max_concurrent_runs=1,
                 tags={
                     "project": "european_climate_risk",
-                    "environment": "production"
+                    "environment": "production",
+                    "compute": "serverless"
                 }
             )
             job_id = response.job_id
-            print(f"✓ Workflow job created successfully: {job_id}")
+            print(f"✓ Serverless workflow job created successfully: {job_id}")
             return job_id
         except Exception as e:
-            print(f"✗ Error creating workflow job: {str(e)}")
+            print(f"✗ Error creating serverless workflow job: {str(e)}")
             return None
     
     def setup_unity_catalog(self):
@@ -249,7 +265,7 @@ class EuropeanRiskPipelineOrchestrator:
         Set up Unity Catalog schemas for the pipeline.
         """
         print("\n" + "="*80)
-        print("Setting up Unity Catalog")
+        print("Setting up Unity Catalog for Serverless Pipelines")
         print("="*80)
         
         catalog = self.config["catalog"]
@@ -259,11 +275,11 @@ class EuropeanRiskPipelineOrchestrator:
         sql_commands = [
             # Create catalog
             f"CREATE CATALOG IF NOT EXISTS {catalog}",
-            f"COMMENT ON CATALOG {catalog} IS 'European Climate Risk Data - Flood and Drought Analysis'",
+            f"COMMENT ON CATALOG {catalog} IS 'European Climate Risk Data - Serverless Pipelines'",
             
             # Create single unified schema
             f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}",
-            f"COMMENT ON SCHEMA {catalog}.{schema} IS 'Unified climate risk data - All layers (Bronze, Silver, Gold)'",
+            f"COMMENT ON SCHEMA {catalog}.{schema} IS 'Unified climate risk data - All layers (Bronze, Silver, Gold) - Serverless'",
             
             # Set default catalog and schema
             f"USE CATALOG {catalog}",
@@ -274,16 +290,17 @@ class EuropeanRiskPipelineOrchestrator:
         for cmd in sql_commands:
             print(f"  {cmd}")
         
-        print("✓ Unity Catalog setup completed")
+        print("✓ Unity Catalog setup completed for serverless pipelines")
     
     def deploy_all_pipelines(self):
         """
-        Deploy all pipelines and create the orchestration workflow.
+        Deploy all serverless pipelines and create the orchestration workflow.
         """
         print("\n" + "="*80)
-        print("European Climate Risk Pipeline Deployment (demo_hc)")
+        print("European Climate Risk Serverless Pipeline Deployment (demo_hc)")
         print("="*80)
         print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Compute Type: Serverless")
         print("="*80)
         
         # Step 1: Setup Unity Catalog
@@ -291,7 +308,7 @@ class EuropeanRiskPipelineOrchestrator:
         
         # Step 2: Create DLT pipelines
         print("\n" + "="*80)
-        print("Creating Delta Live Tables Pipelines")
+        print("Creating Serverless Delta Live Tables Pipelines")
         print("="*80)
         
         pipeline_ids = {}
@@ -302,19 +319,20 @@ class EuropeanRiskPipelineOrchestrator:
         
         # Step 3: Create orchestration workflow
         print("\n" + "="*80)
-        print("Creating Orchestration Workflow")
+        print("Creating Serverless Orchestration Workflow")
         print("="*80)
         
         job_id = self.create_workflow_job(
-            "european_climate_risk_workflow",
+            "european_climate_risk_serverless_workflow",
             pipeline_ids
         )
         
         # Step 4: Summary
         print("\n" + "="*80)
-        print("Deployment Summary")
+        print("Serverless Deployment Summary")
         print("="*80)
         print(f"\nCatalog: {self.config['catalog']}")
+        print(f"Compute: Serverless")
         print(f"\nPipelines Created: {len(pipeline_ids)}")
         for name, pid in pipeline_ids.items():
             print(f"  • {name}: {pid}")
@@ -324,18 +342,26 @@ class EuropeanRiskPipelineOrchestrator:
             print(f"\nWorkflow URL: https://<databricks-instance>/jobs/{job_id}")
         
         print("\n" + "="*80)
-        print("Deployment Complete!")
+        print("Serverless Deployment Complete!")
+        print("="*80)
+        print("🚀 Benefits of Serverless:")
+        print("  • No cluster management required")
+        print("  • Automatic scaling based on workload")
+        print("  • Pay only for compute used")
+        print("  • Faster startup times")
+        print("  • Built-in reliability and fault tolerance")
         print("="*80)
         
         return {
             "pipeline_ids": pipeline_ids,
             "job_id": job_id,
-            "catalog": self.config["catalog"]
+            "catalog": self.config["catalog"],
+            "compute_type": "serverless"
         }
     
     def run_pipeline(self, pipeline_name: str):
         """
-        Manually trigger a specific pipeline.
+        Manually trigger a specific serverless pipeline.
         
         Args:
             pipeline_name: Name of the pipeline to run
@@ -345,13 +371,13 @@ class EuropeanRiskPipelineOrchestrator:
             print(f"Pipeline '{pipeline_name}' not found in configuration")
             return
         
-        print(f"Triggering pipeline: {pipeline_config['name']}")
+        print(f"Triggering serverless pipeline: {pipeline_config['name']}")
         # Implementation would trigger the specific DLT pipeline
-        print("✓ Pipeline triggered")
+        print("✓ Serverless pipeline triggered")
     
     def get_pipeline_status(self, pipeline_id: str) -> dict:
         """
-        Get the status of a DLT pipeline.
+        Get the status of a serverless DLT pipeline.
         
         Args:
             pipeline_id: Pipeline ID
@@ -366,12 +392,44 @@ class EuropeanRiskPipelineOrchestrator:
                 "name": pipeline.name,
                 "state": pipeline.state,
                 "health": pipeline.health,
-                "latest_updates": pipeline.latest_updates
+                "latest_updates": pipeline.latest_updates,
+                "compute_type": "serverless"
             }
         except Exception as e:
             return {
                 "error": str(e)
             }
+    
+    def list_pipeline_libraries(self):
+        """
+        Display the libraries configured for each serverless pipeline.
+        """
+        print("\n" + "="*60)
+        print("Serverless Pipeline Library Configuration")
+        print("="*60)
+        
+        for pipeline_name, config in self.config["pipelines"].items():
+            print(f"\n📋 {pipeline_name.upper()} (Serverless):")
+            print(f"   Pipeline: {config['name']}")
+            if "libraries" in config:
+                print(f"   Libraries: {', '.join(config['libraries'])}")
+            else:
+                print("   Libraries: None configured")
+        
+        print("\n" + "="*60)
+        print("✅ Libraries will be installed automatically on serverless compute")
+        print("✅ No cluster management required")
+        print("✅ Automatic scaling and resource optimization")
+        print("="*60)
+
+# COMMAND ----------
+
+# DBTITLE 1,Library Configuration Demo
+# Initialize orchestrator to see library configuration
+orchestrator = EuropeanRiskPipelineOrchestrator()
+
+# Display the library configuration for each pipeline
+orchestrator.list_pipeline_libraries()
 
 # COMMAND ----------
 
