@@ -56,7 +56,7 @@ import os
 # COMMAND ----------
 
 # Load configuration
-CONFIG_PATH = "/Workspace/Shared/risk_app/config/european_data_sources.yaml"
+CONFIG_PATH = "/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/config/european_data_sources.yaml"
 
 # For local testing, you can also load from a different path
 try:

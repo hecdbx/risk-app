@@ -48,7 +48,7 @@ import math
 
 # Load configuration
 try:
-    with open("/Workspace/Shared/risk_app/config/european_data_sources.yaml", 'r') as f:
+    with open("/Workspace/Users/houssem.chihoub@databricks.com/solutions/risk-app/config/european_data_sources.yaml", 'r') as f:
         config = yaml.safe_load(f)
         FLOOD_THRESHOLDS = config['risk_parameters']['flood_risk']['thresholds']
         DROUGHT_THRESHOLDS = config['risk_parameters']['drought_risk']['thresholds']
