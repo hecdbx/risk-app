@@ -1,4 +1,9 @@
 # Databricks notebook source
+# MAGIC %pip install rasterio geopandas h3 pyyaml rasterfames --quiet
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC # European Terrain and DEM Data Ingestion Pipeline
 # MAGIC 
@@ -9,16 +14,6 @@
 # MAGIC - **GeoHarmonizer** Environmental Layers
 # MAGIC 
 # MAGIC The pipeline uses **Spark's new data source format** for efficient raster data processing.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Installation and Setup
-
-# COMMAND ----------
-
-# MAGIC %pip install rasterio geopandas h3 pyyaml rasterfames --quiet
-# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
